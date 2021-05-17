@@ -13,6 +13,7 @@ import (
 	"github.com/dgraph-io/dgo/v200"
 	"github.com/dgraph-io/dgo/v200/protos/api"
 	"github.com/go-chi/chi"
+	"github.com/go-chi/cors"
 	"google.golang.org/grpc"
 )
 
@@ -55,6 +56,16 @@ func main() {
 	DB = newClient()
 	port := ":3000"
 	r := chi.NewRouter()
+	r.Use(cors.Handler(cors.Options{
+		// AllowedOrigins:   []string{"https://foo.com"}, // Use this to allow specific origin hosts
+		AllowedOrigins: []string{"https://*", "http://*"},
+		// AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: false,
+		MaxAge:           300, // Maximum value not ignored by any of major browsers
+	}))
 	r.Get("/", indexRoute)
 	r.Post("/buyers/{date}", AddBuyer)
 	r.Get("/buyers", getBuyers)
@@ -378,19 +389,20 @@ func getBuyersIp(w http.ResponseWriter, r *http.Request) {
 }
 func getProducts(w http.ResponseWriter, r *http.Request) {
 	k := chi.URLParam(r, "idproduct")
+	fmt.Println(k)
 	const q = `
 	query find_buyer($a:string){
 		find_products(func:eq(idproduct,$a),first: 2){
-			~product {
-				idtransaction
-			  product{
-					idproduct
-			  nameproduct
-			  price
-			}
+		~product {
+			idtransaction
+		  product{
+				idproduct
+		  nameproduct
+		  price
 		}
-		}
-		}
+	}
+}
+}
 		
 	`
 	resp, err := DB.NewTxn().QueryWithVars(context.Background(), q, map[string]string{"$a": k})
@@ -400,15 +412,18 @@ func getProducts(w http.ResponseWriter, r *http.Request) {
 	}
 	var decode struct {
 		FindProducts []struct {
-			Idtransaction string `json:"idtransaction"`
-			Product       []struct {
-				Idproduct   string `json:"idproduct"`
-				Nameproduct string `json:"nameproduct"`
-				Price       int    `json:"price"`
+			Products []struct {
+				Idtransaction string `json:"idtransaction"`
+				Product       []struct {
+					Idproduct   string `json:"idproduct"`
+					Nameproduct string `json:"nameproduct"`
+					Price       int    `json:"price"`
+				} `json:"product"`
 			} `json:"~product"`
 		} `json:"find_products"`
 	}
-
+	fmt.Println(string(resp.Json))
+	fmt.Println(decode)
 	json.Unmarshal(resp.Json, &decode)
 	json.NewEncoder(w).Encode(decode)
 }
