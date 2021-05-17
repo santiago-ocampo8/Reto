@@ -17,6 +17,8 @@ import (
 	"google.golang.org/grpc"
 )
 
+//Structs
+
 type buyer struct {
 	Id   string `json:"id"`
 	Name string `json:"name"`
@@ -41,30 +43,22 @@ type transaction struct {
 	Device        string    `json:"device"`
 	Product       []product `json:"product"`
 }
-type allBuyer []buyer
-type allProducts []product
-type allTransactions []transaction
-type alllistProducts []listProducts
 
-var buyers = allBuyer{}
-var transsactions = allTransactions{}
-var listsProducts = alllistProducts{}
-var products = allProducts{}
 var DB *dgo.Dgraph
 
+//Main
 func main() {
 	DB = newClient()
 	port := ":3000"
 	r := chi.NewRouter()
 	r.Use(cors.Handler(cors.Options{
-		// AllowedOrigins:   []string{"https://foo.com"}, // Use this to allow specific origin hosts
 		AllowedOrigins: []string{"https://*", "http://*"},
-		// AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
+
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: false,
-		MaxAge:           300, // Maximum value not ignored by any of major browsers
+		MaxAge:           300,
 	}))
 	r.Get("/", indexRoute)
 	r.Post("/buyers/{date}", AddBuyer)
@@ -72,66 +66,76 @@ func main() {
 	r.Get("/buyerproducts/{id}", getProductsBuyer)
 	r.Get("/buyersip/{ip}", getBuyersIp)
 	r.Get("/product/{idproduct}", getProducts)
-	r.Post("/borrar", borrar)
 	http.ListenAndServe(port, r)
 
 }
 
+// Create Database
+
+func newClient() *dgo.Dgraph {
+	d, err := grpc.Dial("localhost:9080", grpc.WithInsecure())
+	if err != nil {
+		log.Fatal(err)
+		fmt.Println("Err")
+	}
+	fmt.Println("Db connect")
+	return dgo.NewDgraphClient(
+		api.NewDgraphClient(d),
+	)
+}
+
+//Upload information to the buyers, products and transactions in database
 func AddBuyer(w http.ResponseWriter, r *http.Request) {
 
-	j := chi.URLParam(r, "id")
-
+	date := chi.URLParam(r, "id")
 	clienteHttp := &http.Client{}
-
-	peticion, err := http.NewRequest("GET", "https://kqxty15mpg.execute-api.us-east-1.amazonaws.com/buyers?date="+j, nil)
-
+	request, err := http.NewRequest("GET", "https://kqxty15mpg.execute-api.us-east-1.amazonaws.com/buyers?date="+date, nil)
 	if err != nil {
 		fmt.Println("Error")
 	}
 
-	peticion.Header.Add("Content-Type", "application/json")
-
-	respuesta, err := clienteHttp.Do(peticion)
-
+	request.Header.Add("Content-Type", "application/json")
+	response, err := clienteHttp.Do(request)
 	if err != nil {
 		fmt.Println("Error")
 	}
 
-	defer respuesta.Body.Close()
-	cuerpoRespuesta, err := ioutil.ReadAll(respuesta.Body)
+	defer response.Body.Close()
+	bodyResponse, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		fmt.Println("Error")
 	}
 
 	content1 := []buyer{}
-	json.Unmarshal([]byte(cuerpoRespuesta), &content1)
+	json.Unmarshal([]byte(bodyResponse), &content1)
 
 	clienteHttp = &http.Client{}
-	peticion, err = http.NewRequest("GET", "https://kqxty15mpg.execute-api.us-east-1.amazonaws.com/products?date="+j, nil)
+	request, err = http.NewRequest("GET", "https://kqxty15mpg.execute-api.us-east-1.amazonaws.com/products?date="+date, nil)
 
 	if err != nil {
 		fmt.Println("Error")
 	}
 
-	peticion.Header.Add("Content-Type", "application/json")
+	request.Header.Add("Content-Type", "application/json")
 
-	respuesta, err = clienteHttp.Do(peticion)
+	response, err = clienteHttp.Do(request)
 
 	if err != nil {
 		fmt.Println("Error")
 	}
 
-	defer respuesta.Body.Close()
-	cuerpoRespuesta, err = ioutil.ReadAll(respuesta.Body)
+	defer response.Body.Close()
+	bodyResponse, err = ioutil.ReadAll(response.Body)
 	if err != nil {
 		fmt.Println("Error")
 	}
 
-	respuestaString := string(cuerpoRespuesta)
-	arreglo := strings.Split(respuestaString, "\n")
+	responseString := string(bodyResponse)
+	list := strings.Split(responseString, "\n")
 	var content2 []product
-	for i := 0; i < len(arreglo)-1; i++ {
-		temp := strings.Split(arreglo[i], "'")
+
+	for i := 0; i < len(list)-1; i++ {
+		temp := strings.Split(list[i], "'")
 
 		var newProduct product
 		newProduct.Idproduct = temp[0]
@@ -141,40 +145,40 @@ func AddBuyer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	clienteHttp = &http.Client{}
-	peticion, err = http.NewRequest("GET", "https://kqxty15mpg.execute-api.us-east-1.amazonaws.com/transactions?date="+j, nil)
+	request, err = http.NewRequest("GET", "https://kqxty15mpg.execute-api.us-east-1.amazonaws.com/transactions?date="+date, nil)
 
 	if err != nil {
 		fmt.Println("Error")
 	}
 
-	peticion.Header.Add("Content-Type", "application/json")
+	request.Header.Add("Content-Type", "application/json")
 
-	respuesta, err = clienteHttp.Do(peticion)
+	response, err = clienteHttp.Do(request)
 
 	if err != nil {
 		fmt.Println("Error")
 	}
 
-	defer respuesta.Body.Close()
-	cuerpoRespuesta, err = ioutil.ReadAll(respuesta.Body)
+	defer response.Body.Close()
+	bodyResponse, err = ioutil.ReadAll(response.Body)
 	if err != nil {
 		fmt.Println("Error")
 	}
 
-	//respuestaString := string(cuerpoRespuesta)
-	for i := 0; i < len(cuerpoRespuesta); i++ {
-		if cuerpoRespuesta[i] == 0 {
-			cuerpoRespuesta[i] = 32
+	//responseString := string(bodyResponse)
+	for i := 0; i < len(bodyResponse); i++ {
+		if bodyResponse[i] == 0 {
+			bodyResponse[i] = 32
 		}
 
 	}
-	respuestaString = string(cuerpoRespuesta)
-	respuestaString = strings.TrimRight(respuestaString, "  ")
+	responseString = string(bodyResponse)
+	responseString = strings.TrimRight(responseString, "  ")
 
-	arreglo = strings.Split(respuestaString, "  #")
+	list = strings.Split(responseString, "  #")
 	var content3 []transaction
-	for i := 0; i < len(arreglo); i++ {
-		temp := strings.Split(arreglo[i], " ")
+	for i := 0; i < len(list); i++ {
+		temp := strings.Split(list[i], " ")
 
 		var newTransaction transaction
 		newTransaction.Idtransaction = temp[0]
@@ -193,11 +197,8 @@ func AddBuyer(w http.ResponseWriter, r *http.Request) {
 		list := strings.Split(temp[4], ",")
 		var list2 []product
 		for j := 0; j < len(list); j++ {
-
-			//list2 = append(list2, list[j])
 			var idTemporal = list[j]
 			for n := 0; n < len(content2); n++ {
-				//fmt.Println(n, "<- Aca va n, aca va el tamañp->", len(content2), " Y aca va j->", j)
 				if content2[n].Idproduct == idTemporal {
 					list2 = append(list2, content2[n])
 				}
@@ -247,29 +248,7 @@ func AddBuyer(w http.ResponseWriter, r *http.Request) {
 
 }
 
-/*func getBuyers(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(buyers)
-}*/
-
-//Products
-
-//Database
-
-func newClient() *dgo.Dgraph {
-	// Dial a gRPC connection. The address to dial to can be configured when
-	// setting up the dgraph cluster.
-	d, err := grpc.Dial("localhost:9080", grpc.WithInsecure())
-	if err != nil {
-		log.Fatal(err)
-		fmt.Println("Esto es un error")
-	}
-	fmt.Println("Esto esta bien")
-	return dgo.NewDgraphClient(
-		api.NewDgraphClient(d),
-	)
-}
-
+//Get List of Buyers
 func getBuyers(w http.ResponseWriter, r *http.Request) {
 
 	const q = `
@@ -285,7 +264,6 @@ func getBuyers(w http.ResponseWriter, r *http.Request) {
 		log.Fatal(err)
 
 	}
-	//fmt.Println(" no se que putas es esto ", resp.Json)
 	var decode struct {
 		Find []struct {
 			Groupby []struct {
@@ -301,6 +279,7 @@ func getBuyers(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(decode)
 }
 
+//Get products buy by a buyer
 func getProductsBuyer(w http.ResponseWriter, r *http.Request) {
 	k := chi.URLParam(r, "id")
 
@@ -352,6 +331,7 @@ func getProductsBuyer(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(decode)
 }
 
+// Get buyers with the same ip
 func getBuyersIp(w http.ResponseWriter, r *http.Request) {
 	k := chi.URLParam(r, "ip")
 
@@ -387,9 +367,10 @@ func getBuyersIp(w http.ResponseWriter, r *http.Request) {
 	json.Unmarshal(resp.Json, &decode)
 	json.NewEncoder(w).Encode(decode)
 }
+
+//Product Recommendations
 func getProducts(w http.ResponseWriter, r *http.Request) {
 	k := chi.URLParam(r, "idproduct")
-	fmt.Println(k)
 	const q = `
 	query find_buyer($a:string){
 		find_products(func:eq(idproduct,$a),first: 2){
@@ -402,8 +383,7 @@ func getProducts(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
-}
-		
+}	
 	`
 	resp, err := DB.NewTxn().QueryWithVars(context.Background(), q, map[string]string{"$a": k})
 	if err != nil {
@@ -422,50 +402,13 @@ func getProducts(w http.ResponseWriter, r *http.Request) {
 			} `json:"~product"`
 		} `json:"find_products"`
 	}
-	fmt.Println(string(resp.Json))
-	fmt.Println(decode)
 	json.Unmarshal(resp.Json, &decode)
 	json.NewEncoder(w).Encode(decode)
 }
-func setup() {
-	// Install a schema into dgraph. Accounts have a `name` and a `balance`.
-	err := DB.Alter(context.Background(), &api.Operation{
-		Schema: `
-			id: string @index(term) .
-			name: string .
-			age: int .
-		`,
-	})
-	fmt.Println(" no se que putas es esto ", err)
-	const q = `
-		{
-			all(func: has(name)) {
-				uid
-				name
-			}
-		}
-	`
-	resp, err := DB.NewTxn().Query(context.Background(), q)
-	if err != nil {
-		log.Fatal(err)
-		fmt.Println("esta consulta no se acaba de realizar", resp)
-	}
-	fmt.Println("esta consulta se acaba de realizar", string(resp.Json))
 
-}
-
+//
 func indexRoute(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Fprintf(w, "Welcome to my API")
 
-}
-func borrar(w http.ResponseWriter, r *http.Request) {
-
-	cont := context.Background()
-	op := &api.Operation{}
-	op.DropAll = true
-	err := DB.Alter(cont, op)
-	if err != nil {
-		log.Fatal(err)
-	}
 }

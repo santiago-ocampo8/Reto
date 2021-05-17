@@ -67,13 +67,14 @@ export default {
     getBuyers(){
       const url="http://localhost:3000/"+"buyers";
       this.axios.get(url).then(response=>{
-        var temporal=JSON.stringify(response.data.find[0])
-        var temporal2=temporal.replace("@groupby","group");
-  
-        var final=JSON.parse(temporal2)
-        console.log(final)
-        this.Buyers=final.group
+        if(response.data.find!=null){
+        var temp=JSON.stringify(response.data.find[0])
         
+        var temp2=temp.replace("@groupby","group");
+  
+        var final=JSON.parse(temp2)
+        this.Buyers=final.group
+        }
       })
     },
     infoBuyer(id){
